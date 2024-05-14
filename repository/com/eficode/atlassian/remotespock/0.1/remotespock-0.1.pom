@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.eficode.atlassian</groupId>
+    <artifactId>remotespock</artifactId>
+    <version>0.1</version>
+
+
+    <properties>
+
+        <!-- Set your JIRA version here -->
+        <jira.version>9.15.0</jira.version>
+        <!-- Set your JSM version here -->
+        <jsm.version>5.15.2</jsm.version>
+        <!-- Get Insight Version from: https://packages.atlassian.com/mvn/maven-atlassian-external/com/atlassian/jira/plugins/insight/ -->
+        <insight.version>10.13.0</insight.version>
+        <!-- Get Insight Core Version from: https://packages.atlassian.com/mvn/maven-atlassian-external/com/atlassian/servicedesk/insight-core-model/ -->
+        <insight-core.version>10.13.0</insight-core.version>
+        <!-- Set Groovy Version here - Should normally match ScriptRunners Groovy Version -->
+        <groovy.version>4.0.8</groovy.version>
+
+        <!-- https://marketplace.atlassian.com/apps/6820/scriptrunner-for-jira/version-history -->
+        <scriptrunner.version>8.27.0</scriptrunner.version>
+
+
+        <!-- Get version: https://github.com/eficode/InsightManager/blob/master/pom.xml-->
+        <insightmanager.version>2.0.9-SNAPSHOT</insightmanager.version>
+
+        <!-- Get version: https://github.com/eficode/JiraInstanceManagerRest/blob/master/pom.xml-->
+        <jirainstancemanager.version>2.1.7</jirainstancemanager.version>
+
+        <!-- Get version: https://github.com/eficode/devStack/blob/master/pom.xml-->
+        <devstack.version>2.3.22</devstack.version>
+
+
+        <allure.version>2.25.0</allure.version>
+
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.qameta.allure</groupId>
+                <artifactId>allure-bom</artifactId>
+                <version>${allure.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.groovy</groupId>
+            <artifactId>groovy</artifactId>
+            <version>${groovy.version}</version>
+            <type>pom</type>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+            <version>1.9.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-reporting</artifactId>
+            <version>1.9.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-junit5</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- INSIGHT API -->
+        <dependency>
+            <groupId>com.atlassian.jira.plugins</groupId>
+            <artifactId>insight</artifactId>
+            <version>${insight.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.codehaus.groovy</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.codehaus.groovy.modules.http-builder</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.ehcache</groupId>
+                    <artifactId>ehcache</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jetbrains.kotlin</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.atlassian.servicedesk</groupId>
+            <artifactId>insight-core-model</artifactId>
+            <version>${insight-core.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.jetbrains.kotlin</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+
+        <!-- JIRA API -->
+
+
+
+        <dependency>
+            <groupId>com.atlassian.jira</groupId>
+            <artifactId>jira-api</artifactId>
+            <version>${jira.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>jndi</groupId>
+                    <artifactId>jndi</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jta</groupId>
+                    <artifactId>jta</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>commons-httpclient</groupId>
+                    <artifactId>commons-httpclient</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>com.atlassian.jira</groupId>
+            <artifactId>jira-core</artifactId>
+            <version>${jira.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>jndi</groupId>
+                    <artifactId>jndi</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jta</groupId>
+                    <artifactId>jta</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.atlassian.plugins</groupId>
+                    <artifactId>atlassian-plugins-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.atlassian.plugins</groupId>
+                    <artifactId>atlassian-plugins-osgi</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.atlassian.renderer</groupId>
+                    <artifactId>atlassian-renderer</artifactId>
+                </exclusion>
+
+                <exclusion>
+                    <groupId>net.sf.ehcache</groupId>
+                    <artifactId>ehcache</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.octo.captcha</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>xerces</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>commons-httpclient</groupId>
+                    <artifactId>commons-httpclient</artifactId>
+                </exclusion>
+                <exclusion>
+                        <groupId>com.squareup.okhttp3</groupId>
+                        <artifactId>okhttp</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>com.atlassian.jira.plugins</groupId>
+            <artifactId>jira-greenhopper-plugin</artifactId>
+            <version>7.7.0-DAILY20171221023017</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.octo.captcha</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jta</groupId>
+                    <artifactId>jta</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jndi</groupId>
+                    <artifactId>jndi</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.twdata.pkgscanner</groupId>
+                    <artifactId>package-scanner</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>com.atlassian.servicedesk</groupId>
+            <artifactId>jira-servicedesk-api</artifactId>
+            <version>${jsm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Custom Helper Libs -->
+
+        <!-- https://mvnrepository.com/artifact/org.apache.ivy/ivy -->
+        <dependency>
+            <groupId>org.apache.ivy</groupId>
+            <artifactId>ivy</artifactId>
+            <version>2.5.2</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+        <!-- SCRIPTRUNNER -->
+        <dependency>
+            <groupId>com.onresolve.jira.groovy</groupId>
+            <artifactId>groovyrunner</artifactId>
+            <version>${scriptrunner.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>jndi</groupId>
+                    <artifactId>jndi</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jta</groupId>
+                    <artifactId>jta</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>is.origo.jira</groupId>
+                    <artifactId>tempo-plugin</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.tempoplugin</groupId>
+                    <artifactId>tempo-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+
+        <!-- https://mvnrepository.com/artifact/org.spockframework/spock-core -->
+        <dependency>
+            <groupId>org.spockframework</groupId>
+            <artifactId>spock-core</artifactId>
+            <version>2.4-M1-groovy-3.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+    </dependencies>
+
+
+
+
+
+
+
+    <repositories>
+
+        <repository>
+            <id>Atlassian-External</id>
+            <url>https://packages.atlassian.com/mvn/maven-atlassian-external/</url>
+        </repository>
+        <repository>
+            <id>Adaptavist-external</id>
+            <url>https://nexus.adaptavist.com/content/repositories/external</url>
+            <releases>
+                <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
+                <checksumPolicy>fail</checksumPolicy>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>eficode-jiraManagerRest</id>
+            <url>https://github.com/eficode/JiraInstanceManagerRest/raw/packages/repository/</url>
+        </repository>
+        <repository>
+            <id>eficode-devStack</id>
+            <url>https://github.com/eficode/DevStack/raw/packages/repository/</url>
+        </repository>
+        <repository>
+            <id>eficode-insightManager</id>
+            <url>https://github.com/eficode/InsightManager/raw/packages/repository/</url>
+        </repository>
+    </repositories>
+
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.gmavenplus</groupId>
+                <artifactId>gmavenplus-plugin</artifactId>
+                <version>3.0.2</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>addSources</goal>
+                            <goal>addTestSources</goal>
+                            <goal>generateStubs</goal>
+                            <goal>compile</goal>
+                            <goal>compileTests</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <scripts>
+                        <script>${project.basedir}/.github/buildResources/createStandalonePom.groovy</script>
+                    </scripts>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+
+</project>

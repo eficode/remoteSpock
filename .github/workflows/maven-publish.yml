@@ -32,9 +32,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
+          #Hardcoded key for now
+          key: Linux-maven-89b1c003ca3c48e37dc9ab839a69baacef3d9c8ff67ac39f8514de7290a6cf36
 
 
       - name: Compile and install main version

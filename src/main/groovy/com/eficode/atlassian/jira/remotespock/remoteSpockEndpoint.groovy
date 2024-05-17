@@ -36,6 +36,7 @@ xrayListener.executionFinished(testPlan)
 import com.onresolve.scriptrunner.runner.customisers.WithPlugin
 import groovy.transform.Field
 import io.qameta.allure.junitplatform.AllureJunitPlatform
+import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.AgeFileFilter
 import org.junit.platform.launcher.TestPlan
 import com.onresolve.scriptrunner.runner.rest.common.CustomEndpointDelegate
@@ -51,7 +52,7 @@ import org.junit.platform.launcher.listeners.TestExecutionSummary
 import org.junit.platform.reporting.legacy.xml.LegacyXmlReportGeneratingListener
 import org.junit.platform.reporting.open.xml.OpenTestReportGeneratingListener
 import org.spockframework.runtime.model.FeatureMetadata
-import org.junit.platform.launcher.listeners.MutableTestExecutionSummary
+
 
 import javax.servlet.http.HttpServletRequest
 import javax.ws.rs.core.MediaType
@@ -62,13 +63,14 @@ import org.apache.logging.log4j.core.Logger
 import org.apache.logging.log4j.LogManager
 
 import java.lang.reflect.Method
-import java.nio.file.Path
+
 
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectMethod
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass
 
 @BaseScript CustomEndpointDelegate delegate
-//@WithPlugin("com.riadalabs.jira.plugins.insight")
+
+//@WithPlugin("com.riadalabs.jira.plugins.insight") //Leave to make sure automatic deployment with JIM works
 
 
 
@@ -148,6 +150,12 @@ static Map runSpockClass(Logger logEndpoint, String spockClassName, String spock
 static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, SpockOutputType outputType = SpockOutputType.StringSummary, File spockOutDir = null) {
 
 
+    log.info("Executing Spock Test")
+    log.debug("\tTest name:" + aClass.canonicalName + "#${aMethod ?: "*"}")
+    log.debug("\tWill create output type:" + outputType.name())
+    log.debug("\tWill store output in: ${spockOutDir ? spockOutDir.canonicalPath : "N/A (Output wont be persisted)"}")
+
+    Long startOfTest = System.currentTimeMillis() - 2000
     LauncherDiscoveryRequest request
     //Clear any previous related properties
     System.clearProperty("junit.platform.reporting.open.xml.enabled")
@@ -167,14 +175,11 @@ static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, Spo
 
     Launcher launcher = LauncherFactory.create();
 
-    Date startOfTest = new Date()
+
     Map outputMap = [:]
-    File outputDir = spockOutDir
-    if (!spockOutDir) {
-        outputDir = File.createTempDir("spockTemp")
-        log.info("Created temp dir:" + outputDir.name + ", for test:" + outputType.name())
-    }
-    outputDir.mkdirs()
+    File tempOutDir = new File(".tempSpockReports/" + outputType.name() + "/").canonicalFile
+    tempOutDir.mkdirs()
+
 
 
     switch (outputType) {
@@ -190,7 +195,9 @@ static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, Spo
             summary.printFailuresTo(printWriter)
 
             String output = stringWriter.buffer.toString()
-            outputMap = ["summary": output]
+            File sumFile = new File(tempOutDir, "summary-" + System.currentTimeMillis().toString().takeRight(5) + ".txt")
+            sumFile.text = output
+            outputMap = [(sumFile.name): sumFile.text]
 
             break
 
@@ -198,7 +205,7 @@ static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, Spo
 
             StringWriter stringWriter = new StringWriter()
             PrintWriter printWriter = new PrintWriter(stringWriter)
-            LegacyXmlReportGeneratingListener listener = new LegacyXmlReportGeneratingListener(outputDir.toPath(), printWriter)
+            LegacyXmlReportGeneratingListener listener = new LegacyXmlReportGeneratingListener(tempOutDir.toPath(), printWriter)
             launcher.registerTestExecutionListeners(listener)
             TestPlan testPlan = launcher.discover(request)
             listener.testPlanExecutionStarted(testPlan)
@@ -212,8 +219,16 @@ static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, Spo
             }
 
 
-            outputDir.listFiles(new AgeFileFilter(startOfTest, false) as FileFilter).findAll { it.name.endsWith(".xml") }.each {
-                outputMap.put(it.name, it.text)
+            tempOutDir.listFiles(new AgeFileFilter(startOfTest, false) as FileFilter).findAll { it.name.endsWith(".xml") }.each {
+                log.trace("\t"*2 + "Got output file: " + it.name + ", will rename it to make it unique")
+                String newFileName = System.currentTimeMillis().toString().takeRight(5) + ".xml"
+                newFileName = it.name.replace(".xml", newFileName)
+                File newFile = it.toPath().resolveSibling(newFileName).toFile()
+                it.renameTo(newFile)
+
+                log.trace("\t"*3 + "New name:" + newFile.name)
+
+                outputMap.put(newFile.name, newFile.text)
             }
 
 
@@ -222,7 +237,7 @@ static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, Spo
         case SpockOutputType.OpenTestReport:
 
             System.setProperty("junit.platform.reporting.open.xml.enabled", "true")
-            System.setProperty("junit.platform.reporting.output.dir", outputDir.canonicalPath)
+            System.setProperty("junit.platform.reporting.output.dir", tempOutDir.canonicalPath)
 
 
             OpenTestReportGeneratingListener listener = new OpenTestReportGeneratingListener()
@@ -233,17 +248,16 @@ static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, Spo
             listener.testPlanExecutionFinished(testPlan)
 
 
-            outputDir.listFiles().findAll { it.name.endsWith(".xml") && it.text != null }.each {
+            tempOutDir.listFiles(new AgeFileFilter(startOfTest, false) as FileFilter).findAll { it.name.endsWith(".xml") }.each {
+                log.trace("\t"*2 + "Got output file: " + it.name)
                 outputMap.put(it.name, it.text)
             }
-
 
             break
 
         case SpockOutputType.AllureReport:
 
-            System.setProperty("allure.results.directory", outputDir.canonicalPath)
-            def direProp = System.getProperty("allure.results.directory")
+            System.setProperty("allure.results.directory", tempOutDir.canonicalPath)
 
 
             AllureJunitPlatform listener = new AllureJunitPlatform()
@@ -256,11 +270,10 @@ static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, Spo
 
             //listener.lifecycle.getDefaultWriter()
 
-            outputDir.listFiles().findAll { it.name.endsWith(".json") && it.text != null }.each {
+            tempOutDir.listFiles(new AgeFileFilter(startOfTest, false) as FileFilter).findAll { it.name.endsWith(".json") }.each {
+                log.trace("\t"*2 + "Got output file: " + it.name)
                 outputMap.put(it.name, it.text)
             }
-
-
             break
         default:
             throw new InputMismatchException("Unsupported output type ${outputType}")
@@ -269,24 +282,21 @@ static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, Spo
     }
 
 
-    //Cleanup temp dirs
-    File tempRoot = new File(System.getProperty("java.io.tmpdir"))
-    tempRoot.eachDir{
-        if (it.name.startsWith("spockTemp")) {
-            assert it.deleteDir()
-            log.info("\tDeleted temp dir:" + it.name)
+    if (spockOutDir) {
+        tempOutDir.eachFile {src ->
+            log.debug("\tPersisting test file:" + src.name)
+            FileUtils.moveFileToDirectory(src, spockOutDir, true)
         }
+
     }
 
+    //Cleanup temp dirs and files
+    assert tempOutDir.deleteDir() : "Error deleting temp dir:" + tempOutDir.canonicalPath
 
 
     System.clearProperty("junit.platform.reporting.open.xml.enabled")
-    System.clearProperty("junit.platform.reporting.output.dir")
-    System.clearProperty("allure.results.directory")
-
 
     return outputMap
-
 
 }
 

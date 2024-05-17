@@ -96,7 +96,7 @@ remoteSpock(httpMethod: "POST", groups: ["jira-administrators"]) { MultivaluedMa
 
         finalOutput = runSpockClass(log, bodyMap.get("className", null) as String, bodyMap.get("methodName", null) as String, bodyMap.get("outputType", null) as SpockOutputType, bodyMap.get("outputDirPath", null) as String)
 
-        log.info("Finished running spock class, returning output:\n" + finalOutput)
+        log.info("Finished running spock class, returning output:\n" + finalOutput.take(150) + (body.size() > 150 ? "..." : ""))
         return Response.ok(finalOutput, MediaType.APPLICATION_JSON).build()
 
     } else {

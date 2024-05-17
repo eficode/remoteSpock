@@ -192,7 +192,7 @@ class RemoteSpockSpec extends Specification {
             assert jim.createScriptedRestEndpoint(endpointFilePath): "Error setting up remoteSpock endpoint"
         }
 
-        jsmDep.jsmContainer.runBashCommandInContainer("rm -rf \"$reportOutDir\"")
+        //jsmDep.jsmContainer.runBashCommandInContainer("rm -rf \"$reportOutDir\"")
         jim.clearCodeCaches()
 
         /** ---- ---- Testing StringSummary ---- ---- **/
@@ -307,6 +307,8 @@ class RemoteSpockSpec extends Specification {
         where:
         srVersionNumber | last
         "latest"        | false
+        "8.20.0"        | false
+        "8.10.0"        | true
 
     }
 

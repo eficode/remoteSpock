@@ -33,7 +33,7 @@
         <jirainstancemanager.version>2.1.7</jirainstancemanager.version>
 
         <!-- Get version: https://github.com/eficode/devStack/blob/master/pom.xml-->
-        <devstack.version>2.3.23</devstack.version>
+        <devstack.version>2.3.22</devstack.version>
 
 
         <allure.version>2.25.0</allure.version>

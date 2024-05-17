@@ -6,7 +6,7 @@
 
     <groupId>com.eficode.atlassian</groupId>
     <artifactId>remotespock</artifactId>
-    <version>0.1</version>
+    <version>0.2</version>
 
 
     <properties>

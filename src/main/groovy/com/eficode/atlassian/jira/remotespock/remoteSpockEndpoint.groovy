@@ -1,5 +1,7 @@
 package com.eficode.atlassian.jira.remotespock
 
+import com.eficode.atlassian.jira.remotespock.beans.responses.SpockOutputType
+
 
 /*
 To Add Xray Reporting:
@@ -18,7 +20,7 @@ xrayListener.executionFinished(testPlan)
 
 
 @Grapes(
-        @Grab(group='io.qameta.allure', module='allure-junit5', version='2.27.0')
+        @Grab(group = 'io.qameta.allure', module = 'allure-junit5', version = '2.27.0')
 )
 
 /**
@@ -32,7 +34,10 @@ xrayListener.executionFinished(testPlan)
 
 
 import com.onresolve.scriptrunner.runner.customisers.WithPlugin
+import groovy.transform.Field
 import io.qameta.allure.junitplatform.AllureJunitPlatform
+import org.apache.commons.io.FileUtils
+import org.apache.commons.io.filefilter.AgeFileFilter
 import org.junit.platform.launcher.TestPlan
 import com.onresolve.scriptrunner.runner.rest.common.CustomEndpointDelegate
 import groovy.transform.BaseScript
@@ -44,6 +49,7 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder
 import org.junit.platform.launcher.core.LauncherFactory
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener
 import org.junit.platform.launcher.listeners.TestExecutionSummary
+import org.junit.platform.reporting.legacy.xml.LegacyXmlReportGeneratingListener
 import org.junit.platform.reporting.open.xml.OpenTestReportGeneratingListener
 import org.spockframework.runtime.model.FeatureMetadata
 
@@ -63,35 +69,35 @@ import static org.junit.platform.engine.discovery.DiscoverySelectors.selectMetho
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass
 
 @BaseScript CustomEndpointDelegate delegate
-//@WithPlugin("com.riadalabs.jira.plugins.insight")
+
+//@WithPlugin("com.riadalabs.jira.plugins.insight") //Leave to make sure automatic deployment with JIM works
 
 
-Logger log = LogManager.getLogger("remoteSpec.util.jiraLocal.remoteSpoc") as Logger
+
+Logger log = LogManager.getLogger("remoteSpec.util.jiraLocal.remoteSpocEndpoint") as Logger
 Configurator.setLevel(log, Level.ALL)
-log.addAppender()
+ObjectMapper objectMapper = new ObjectMapper()
 
 remoteSpock(httpMethod: "POST", groups: ["jira-administrators"]) { MultivaluedMap queryParams, String body, HttpServletRequest request ->
 
-
-    ObjectMapper objectMapper = new ObjectMapper()
 
     log.info("Remote Spock triggered")
     String urlSubPath = getAdditionalPath(request)
     log.debug("\tGot url sub path:" + urlSubPath)
     log.debug("\tGot query parameters:" + queryParams)
-    log.debug("\tGot body:" + body.take(15) + (body.size() > 15 ? "..." : ""))
+    log.debug("\tGot body:" + body.take(150) + (body.size() > 150 ? "..." : ""))
 
 
-    String finalOutput = ""
+    Map finalOutput = [:]
     if (urlSubPath.startsWith("/spock/class")) {
         log.info("\tRunning spock class")
 
         Map bodyMap = objectMapper.readValue(body, Map)
 
-        finalOutput = runSpockClass(log, bodyMap.get("className", null) as String, bodyMap.get("methodName", null) as String)
+        finalOutput = runSpockClass(log, bodyMap.get("className", null) as String, bodyMap.get("methodName", null) as String, bodyMap.get("outputType", null) as SpockOutputType, bodyMap.get("outputDirPath", null) as String)
 
-        log.info("Finished running spock class, returning output:\n" + finalOutput)
-        return Response.ok(finalOutput, MediaType.TEXT_PLAIN).build()
+        log.info("Finished running spock class, returning output:\n" + finalOutput.take(150) + (body.size() > 150 ? "..." : ""))
+        return Response.ok(finalOutput, MediaType.APPLICATION_JSON).build()
 
     } else {
         return Response.status(Response.Status.BAD_REQUEST).entity("Unsupported url sub path:" + urlSubPath).build()
@@ -100,7 +106,7 @@ remoteSpock(httpMethod: "POST", groups: ["jira-administrators"]) { MultivaluedMa
 
 }
 
-static String runSpockClass(Logger logEndpoint, String spockClassName, String spockMethodName = "") {
+static Map runSpockClass(Logger logEndpoint, String spockClassName, String spockMethodName = "", SpockOutputType outputType = null, String outputDirPath = "") {
 
 
     logEndpoint.info("Starting Spock test")
@@ -129,28 +135,36 @@ static String runSpockClass(Logger logEndpoint, String spockClassName, String sp
         logEndpoint.debug("\t\tFound method: " + spockMethod.name + " (compiled name)")
     }
 
-    TestExecutionSummary spockSummary = executeSpockTest(spockClass, spockMethod)
-
-    StringWriter stringWriter = new StringWriter()
-    PrintWriter printWriter = new PrintWriter(stringWriter)
-    spockSummary.printTo(printWriter)
-    spockSummary.printFailuresTo(printWriter)
+    File outputDir = outputDirPath ? new File(outputDirPath) : null
 
 
-    String out = stringWriter.dump()
 
-    logEndpoint.info(out)
+    Map spockOut = executeSpockTest(logEndpoint, spockClass, spockMethod, outputType, outputDir)
 
-    return out
+
+    return spockOut
 
 }
 
 
-static TestExecutionSummary executeSpockTest(Class aClass, Method aMethod = null) {
+static Map executeSpockTest(Logger log, Class aClass, Method aMethod = null, SpockOutputType outputType = SpockOutputType.StringSummary, File spockOutDir = null) {
 
-    System.setProperty("junit.platform.reporting.open.xml.enabled", "true")
 
+    log.info("Executing Spock Test")
+    log.debug("\tTest name:" + aClass.canonicalName + "#${aMethod ?: "*"}")
+    log.debug("\tWill create output type:" + outputType.name())
+    log.debug("\tWill store output in: ${spockOutDir ? spockOutDir.canonicalPath : "N/A (Output wont be persisted)"}")
+
+    Long startOfTest = System.currentTimeMillis() - 2000
     LauncherDiscoveryRequest request
+    //Clear any previous related properties
+    System.clearProperty("junit.platform.reporting.open.xml.enabled")
+    System.clearProperty("junit.platform.reporting.output.dir")
+    System.clearProperty("allure.results.directory")
+
+
+
+
 
     if (aMethod) {
         request = LauncherDiscoveryRequestBuilder.request().selectors(selectMethod(aClass, aMethod)).build()
@@ -162,30 +176,128 @@ static TestExecutionSummary executeSpockTest(Class aClass, Method aMethod = null
     Launcher launcher = LauncherFactory.create();
 
 
-    SummaryGeneratingListener sumListener = new SummaryGeneratingListener();
-    OpenTestReportGeneratingListener listener = new OpenTestReportGeneratingListener()
-
-    AllureJunitPlatform allureListener = new AllureJunitPlatform()
-
-    launcher.registerTestExecutionListeners(listener)
-
-    launcher.registerTestExecutionListeners(allureListener)
-    launcher.registerTestExecutionListeners(sumListener)
-    TestPlan testPlan = launcher.discover(request)
+    Map outputMap = [:]
+    File tempOutDir = new File(".tempSpockReports/" + outputType.name() + "/").canonicalFile
+    tempOutDir.mkdirs()
 
 
-    allureListener.testPlanExecutionStarted(testPlan)
 
-    listener.testPlanExecutionStarted(testPlan)
-    launcher.execute(request)
-    listener.testPlanExecutionFinished(testPlan)
+    switch (outputType) {
 
-    allureListener.testPlanExecutionFinished(testPlan)
+        case SpockOutputType.StringSummary:
+            SummaryGeneratingListener sumListener = new SummaryGeneratingListener()
+            launcher.registerTestExecutionListeners(sumListener)
+            launcher.execute(request)
+            TestExecutionSummary summary = sumListener.getSummary()
+            StringWriter stringWriter = new StringWriter()
+            PrintWriter printWriter = new PrintWriter(stringWriter)
+            summary.printTo(printWriter)
+            summary.printFailuresTo(printWriter)
+
+            String output = stringWriter.buffer.toString()
+            File sumFile = new File(tempOutDir, "summary-" + System.currentTimeMillis().toString().takeRight(5) + ".txt")
+            sumFile.text = output
+            outputMap = [(sumFile.name): sumFile.text]
+
+            break
+
+        case SpockOutputType.LegacyXml:
+
+            StringWriter stringWriter = new StringWriter()
+            PrintWriter printWriter = new PrintWriter(stringWriter)
+            LegacyXmlReportGeneratingListener listener = new LegacyXmlReportGeneratingListener(tempOutDir.toPath(), printWriter)
+            launcher.registerTestExecutionListeners(listener)
+            TestPlan testPlan = launcher.discover(request)
+            listener.testPlanExecutionStarted(testPlan)
+            launcher.execute(request)
+            listener.testPlanExecutionFinished(testPlan)
 
 
-    TestExecutionSummary summary = sumListener.getSummary()
+            if (stringWriter.buffer.length()) {
+                //Should only happen if exception is thrown
+                outputMap.put("exception", stringWriter.buffer.toString())
+            }
 
-    return summary
+
+            tempOutDir.listFiles(new AgeFileFilter(startOfTest, false) as FileFilter).findAll { it.name.endsWith(".xml") }.each {
+                log.trace("\t"*2 + "Got output file: " + it.name + ", will rename it to make it unique")
+                String newFileName = System.currentTimeMillis().toString().takeRight(5) + ".xml"
+                newFileName = it.name.replace(".xml", newFileName)
+                File newFile = it.toPath().resolveSibling(newFileName).toFile()
+                it.renameTo(newFile)
+
+                log.trace("\t"*3 + "New name:" + newFile.name)
+
+                outputMap.put(newFile.name, newFile.text)
+            }
+
+
+            break
+
+        case SpockOutputType.OpenTestReport:
+
+            System.setProperty("junit.platform.reporting.open.xml.enabled", "true")
+            System.setProperty("junit.platform.reporting.output.dir", tempOutDir.canonicalPath)
+
+
+            OpenTestReportGeneratingListener listener = new OpenTestReportGeneratingListener()
+            launcher.registerTestExecutionListeners(listener)
+            TestPlan testPlan = launcher.discover(request)
+            listener.testPlanExecutionStarted(testPlan)
+            launcher.execute(request)
+            listener.testPlanExecutionFinished(testPlan)
+
+
+            tempOutDir.listFiles(new AgeFileFilter(startOfTest, false) as FileFilter).findAll { it.name.endsWith(".xml") }.each {
+                log.trace("\t"*2 + "Got output file: " + it.name)
+                outputMap.put(it.name, it.text)
+            }
+
+            break
+
+        case SpockOutputType.AllureReport:
+
+            System.setProperty("allure.results.directory", tempOutDir.canonicalPath)
+
+
+            AllureJunitPlatform listener = new AllureJunitPlatform()
+            launcher.registerTestExecutionListeners(listener)
+            TestPlan testPlan = launcher.discover(request)
+            listener.testPlanExecutionStarted(testPlan)
+            launcher.execute(request)
+            listener.testPlanExecutionFinished(testPlan)
+
+
+            //listener.lifecycle.getDefaultWriter()
+
+            tempOutDir.listFiles(new AgeFileFilter(startOfTest, false) as FileFilter).findAll { it.name.endsWith(".json") }.each {
+                log.trace("\t"*2 + "Got output file: " + it.name)
+                outputMap.put(it.name, it.text)
+            }
+            break
+        default:
+            throw new InputMismatchException("Unsupported output type ${outputType}")
+
+
+    }
+
+
+    if (spockOutDir) {
+        tempOutDir.eachFile {src ->
+            log.debug("\tPersisting test file:" + src.name)
+            FileUtils.moveFileToDirectory(src, spockOutDir, true)
+        }
+
+    }
+
+    //Cleanup temp dirs and files
+    assert tempOutDir.deleteDir() : "Error deleting temp dir:" + tempOutDir.canonicalPath
+
+
+    System.clearProperty("junit.platform.reporting.open.xml.enabled")
+
+    return outputMap
+
 }
 
 
